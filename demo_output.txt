@@ -1,0 +1,24 @@
+RUN 1
+ParkReserve C++17 | reserve
+park PLATE TYPE | exit PLATE | find PLATE
+status | history | quit   (1 bike, 2 car, 3 truck)
+Slot 1: native bay
+Slot 2: native bay
+Slot 3: native bay
+Slot 4: native bay
+Slot 5: native bay
+Slot 6: native bay
+Slot 7: native bay
+Slot 8: native bay
+Slot 9: native bay
+Slot 10: native bay
+Slot 11: overflow; free after=19; reserve=2
+Slot 11
+Bill INR 10
+
+RUN 2 AFTER RESTART
+ParkReserve C++17 | reserve
+park PLATE TYPE | exit PLATE | find PLATE
+status | history | quit   (1 bike, 2 car, 3 truck)
+Slot 1
+Not found
