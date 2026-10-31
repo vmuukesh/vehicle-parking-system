@@ -1,8 +1,8 @@
 # Vehicle Parking Management System
 
-This is my C++ project for [COURSE NAME]. It is a console program that manages a small parking lot: it gives a slot to each vehicle, notes the entry time, and makes a bill when the vehicle leaves.
+This is my C++ project for OOPs C++ . It is a console program that manages a small parking lot: it gives a slot to each vehicle, notes the entry time, and makes a bill when the vehicle leaves.
 
-**Name:** VARLA MUKESH
+**Name:** V.MUKESH
 **Reg. No:** AP2511011021
 **University:** SRM University AP
 
