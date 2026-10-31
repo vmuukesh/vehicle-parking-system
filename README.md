@@ -27,11 +27,15 @@ You need a C++ compiler that supports C++11 or later.
 
 Compile the program:
 
+```bash
 g++ -std=c++17 main.cpp -o parking
+```
 
 Run on Linux or macOS:
 
+```bash
 ./parking
+```
 
 On Windows, run parking.exe.
 
