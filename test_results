@@ -1,0 +1,35 @@
+PASS 1 native allocation
+PASS 2 normalization and search
+PASS 3 duplicate rejected
+PASS 4 invalid plate rejected
+PASS 5 invalid type rejected
+PASS 6 minimum one hour
+PASS 7 exact hour
+PASS 8 started hour rounded up
+PASS 9 unknown departure
+PASS 10 backward clock
+PASS 11 timestamp bound
+PASS 12 bike overflow with explanation
+PASS 13 overflow charged by vehicle type
+PASS 14 car reserve protected
+PASS 15 native may consume reserve
+PASS 16 car to truck overflow
+PASS 17 truck reserve protected
+PASS 18 truck consumes reserve
+PASS 19 full lot rejection
+PASS 20 fixed policy blocks overflow
+PASS 21 restart replay
+PASS 22 replayed billing
+PASS 23 departure replay
+PASS 24 policy mismatch blocked
+PASS 25 corrupt journal blocked
+PASS 26 duplicate journal event
+PASS 27 unwritable path rejected
+TOTAL 27 tests passed
+SCENARIO,policy,accepted,bikes,cars,trucks
+A,fixed,13,10,2,1
+A,reserve,19,16,2,1
+B,fixed,35,10,20,5
+B,reserve,35,10,20,5
+C,fixed,35,10,20,5
+C,reserve,35,28,6,1
