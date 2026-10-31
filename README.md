@@ -2,10 +2,10 @@
 
 What it can do
 
-- Park a vehicle (bike, car or truck) and give it a free slot of its own type
-- Remove a vehicle and print the bill
-- Search a vehicle by its number
-- Show all slots, the parked vehicles, and how many slots are used
+- Parking a vehicle (bike, car or truck) and give it a free slot of its own type
+- Removing a vehicle and print the bill
+- Searching a vehicle by its number
+- Showing all the slots, the parked vehicles, and how many slots are used
 - Remember parked vehicles after the program is closed (saved in a text file)
 - Keep a history of all finished parkings in `history.csv`
 
