@@ -1,6 +1,3 @@
-// Vehicle Parking Management System
-// Menu-driven console application with file-based persistence.
-
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -18,7 +15,6 @@ using namespace std;
 const string DATA_FILE = "parking_data.txt";
 const string HISTORY_FILE = "history.csv";
 
-// ---------------------------------------------------------------- types ---
 
 enum class VehicleType { Bike = 1, Car = 2, Truck = 3 };
 
@@ -31,7 +27,6 @@ string typeName(VehicleType t) {
     return "Unknown";
 }
 
-// Hourly rate in rupees.
 double hourlyRate(VehicleType t) {
     switch (t) {
         case VehicleType::Bike:  return 10.0;
@@ -40,9 +35,6 @@ double hourlyRate(VehicleType t) {
     }
     return 0.0;
 }
-
-// ------------------------------------------------------------ utilities ---
-
 string normalisePlate(const string& raw) {
     string out;
     for (char c : raw) {
@@ -89,18 +81,11 @@ int billableHours(time_t entry, time_t exit) {
     int hours = static_cast<int>(ceil(seconds / 3600.0));
     return max(hours, 1);
 }
-
-// -------------------------------------------------------------- Vehicle ---
-
 struct Vehicle {
     string plate;
     VehicleType type = VehicleType::Car;
     time_t entryTime = 0;
 };
-
-// ----------------------------------------------------------------- Slot ---
-
-class Slot {
 public:
     Slot(int number, VehicleType type) : number_(number), type_(type) {}
 
@@ -125,9 +110,6 @@ private:
     bool occupied_ = false;
     Vehicle vehicle_;
 };
-
-// ----------------------------------------------------------- ParkingLot ---
-
 class ParkingLot {
 public:
     ParkingLot(int bikeSlots, int carSlots, int truckSlots) {
@@ -319,8 +301,6 @@ private:
             << v.entryTime << ',' << exitTime << ',' << fixed << setprecision(2) << fee << '\n';
     }
 };
-
-// ----------------------------------------------------------------- menu ---
 
 VehicleType askVehicleType() {
     cout << "  1. Bike\n  2. Car\n  3. Truck\n";
