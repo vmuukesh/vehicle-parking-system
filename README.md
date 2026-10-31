@@ -1,12 +1,6 @@
-# Vehicle Parking Management System
+ Vehicle Parking Management System
 
-This is my C++ project for OOPs C++ . It is a console program that manages a small parking lot: it gives a slot to each vehicle, notes the entry time, and makes a bill when the vehicle leaves.
-
-**Name:** V.MUKESH
-**Reg. No:** AP2511011021
-**University:** SRM University AP
-
-## What it can do
+What it can do
 
 - Park a vehicle (bike, car or truck) and give it a free slot of its own type
 - Remove a vehicle and print the bill
@@ -15,7 +9,7 @@ This is my C++ project for OOPs C++ . It is a console program that manages a sma
 - Remember parked vehicles after the program is closed (saved in a text file)
 - Keep a history of all finished parkings in `history.csv`
 
-## How the bill is calculated
+How the bill is calculated
 
 Every hour that has started is charged, and the minimum is 1 hour. So 1 hour 10 minutes counts as 2 hours.
 
@@ -29,12 +23,15 @@ The lot has 10 bike slots, 20 car slots and 5 truck slots. These numbers can be 
 
 ## How to run
 
-You need a C++ compiler like g++.
+You need a C++ compiler that supports C++11 or later.
 
-```
-g++ -std=c++17 -o parking main.cpp
+Compile the program:
+
+g++ -std=c++17 main.cpp -o parking
+
+Run on Linux or macOS:
+
 ./parking
-```
 
-On Windows, run `parking.exe` instead.
+On Windows, run parking.exe.
 
