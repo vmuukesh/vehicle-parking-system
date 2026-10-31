@@ -1,347 +1,617 @@
-#include <algorithm>
-#include <cctype>
-#include <cmath>
-#include <ctime>
-#include <fstream>
-#include <iomanip>
 #include <iostream>
-#include <limits>
-#include <sstream>
-#include <string>
+#include <fstream>
 #include <vector>
-
+#include <string>
+#include <ctime>
+#include <iomanip>
+#include <limits>
 using namespace std;
 
-const string DATA_FILE = "parking_data.txt";
-const string HISTORY_FILE = "history.csv";
+enum VehicleType { BIKE = 1, CAR = 2, TRUCK = 3 };
 
+const string ADMIN_PASSWORD = "parking123";
 
-enum class VehicleType { Bike = 1, Car = 2, Truck = 3 };
+int bikeRate = 10;
+int carRate = 30;
+int truckRate = 60;
 
-string typeName(VehicleType t) {
-    switch (t) {
-        case VehicleType::Bike:  return "Bike";
-        case VehicleType::Car:   return "Car";
-        case VehicleType::Truck: return "Truck";
+string getTypeName(int type) {
+    if (type == BIKE) return "Bike";
+    if (type == CAR) return "Car";
+    return "Truck";
+}
+
+int getRate(int type) {
+    if (type == BIKE) return bikeRate;
+    if (type == CAR) return carRate;
+    return truckRate;
+}
+
+string getTimeText(time_t t) {
+    char text[30];
+    strftime(text, sizeof(text), "%d-%m-%Y %H:%M", localtime(&t));
+    return text;
+}
+
+string showName(string name) {
+    for (int i = 0; i < (int)name.size(); i++) {
+        if (name[i] == '_') {
+            name[i] = ' ';
+        }
     }
-    return "Unknown";
+    return name;
 }
 
-double hourlyRate(VehicleType t) {
-    switch (t) {
-        case VehicleType::Bike:  return 10.0;
-        case VehicleType::Car:   return 30.0;
-        case VehicleType::Truck: return 60.0;
+void loadRates() {
+    ifstream file("rates.txt");
+    if (file) {
+        file >> bikeRate >> carRate >> truckRate;
     }
-    return 0.0;
 }
-string normalisePlate(const string& raw) {
-    string out;
-    for (char c : raw) {
-        if (!isspace(static_cast<unsigned char>(c)) && c != '-')
-            out += static_cast<char>(toupper(static_cast<unsigned char>(c)));
+
+void saveRates() {
+    ofstream file("rates.txt");
+    file << bikeRate << " " << carRate << " " << truckRate << endl;
+}
+
+struct Vehicle {
+    string number;
+    int type;
+    time_t entryTime;
+    string owner;
+    string phone;
+};
+
+class Slot {
+private:
+    int slotNo;
+    int type;
+    bool full;
+    Vehicle vehicle;
+
+public:
+    Slot(int no, int t) {
+        slotNo = no;
+        type = t;
+        full = false;
     }
-    return out;
-}
 
-string formatTime(time_t t) {
-    char buf[32];
-    strftime(buf, sizeof(buf), "%d-%m-%Y %H:%M", localtime(&t));
-    return buf;
-}
+    int getSlotNo() { return slotNo; }
+    int getType() { return type; }
+    bool isFull() { return full; }
+    Vehicle getVehicle() { return vehicle; }
 
-int readInt(const string& prompt, int lo, int hi) {
-    int value;
+    void parkVehicle(Vehicle v) {
+        vehicle = v;
+        full = true;
+    }
+
+    Vehicle removeVehicle() {
+        full = false;
+        return vehicle;
+    }
+};
+
+class ParkingLot {
+private:
+    vector<Slot> slots;
+    vector<string> passes;
+
+    int findFreeSlot(int type) {
+        for (int i = 0; i < (int)slots.size(); i++) {
+            if (slots[i].getType() == type && !slots[i].isFull()) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    int findVehicle(string number) {
+        for (int i = 0; i < (int)slots.size(); i++) {
+            if (slots[i].isFull() && slots[i].getVehicle().number == number) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    bool hasPass(string number) {
+        for (int i = 0; i < (int)passes.size(); i++) {
+            if (passes[i] == number) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void saveHistory(Vehicle v, int slotNo, time_t exitTime, int fee) {
+        ofstream file("history.txt", ios::app);
+        file << v.number << " " << v.type << " " << slotNo << " "
+             << v.entryTime << " " << exitTime << " " << fee << endl;
+    }
+
+    void savePasses() {
+        ofstream file("passes.txt");
+        for (int i = 0; i < (int)passes.size(); i++) {
+            file << passes[i] << endl;
+        }
+    }
+
+public:
+    ParkingLot(int bikes, int cars, int trucks) {
+        int no = 1;
+        for (int i = 0; i < bikes; i++) {
+            slots.push_back(Slot(no, BIKE));
+            no++;
+        }
+        for (int i = 0; i < cars; i++) {
+            slots.push_back(Slot(no, CAR));
+            no++;
+        }
+        for (int i = 0; i < trucks; i++) {
+            slots.push_back(Slot(no, TRUCK));
+            no++;
+        }
+    }
+
+    void parkVehicle(string number, int type, string owner, string phone) {
+        if (findVehicle(number) != -1) {
+            cout << "This vehicle is already parked." << endl;
+            return;
+        }
+
+        int index = findFreeSlot(type);
+        if (index == -1) {
+            cout << "Sorry, no free slot for a " << getTypeName(type) << "." << endl;
+            return;
+        }
+
+        Vehicle v;
+        v.number = number;
+        v.type = type;
+        v.entryTime = time(NULL);
+        v.owner = owner;
+        v.phone = phone;
+        slots[index].parkVehicle(v);
+        saveData();
+
+        cout << endl;
+        cout << "Vehicle parked successfully." << endl;
+        cout << "Vehicle number : " << number << endl;
+        cout << "Vehicle type   : " << getTypeName(type) << endl;
+        cout << "Owner name     : " << showName(owner) << endl;
+        cout << "Slot number    : " << slots[index].getSlotNo() << endl;
+        cout << "Entry time     : " << getTimeText(v.entryTime) << endl;
+        cout << "Rate per hour  : Rs. " << getRate(type) << endl;
+        if (hasPass(number)) {
+            cout << "This vehicle has a monthly pass. You get 50% off." << endl;
+        }
+    }
+
+    void removeVehicle(string number) {
+        int index = findVehicle(number);
+        if (index == -1) {
+            cout << "This vehicle is not in the parking lot." << endl;
+            return;
+        }
+
+        time_t now = time(NULL);
+        Vehicle v = slots[index].removeVehicle();
+
+        long long seconds = now - v.entryTime;
+        int hours = seconds / 3600;
+        if (seconds % 3600 != 0) {
+            hours++;
+        }
+        if (hours == 0) {
+            hours = 1;
+        }
+        int fee = hours * getRate(v.type);
+        bool discount = hasPass(v.number);
+        if (discount) {
+            fee = fee / 2;
+        }
+
+        cout << endl;
+        cout << "Vehicle removed. Here is the bill." << endl;
+        cout << "Vehicle number : " << v.number << endl;
+        cout << "Vehicle type   : " << getTypeName(v.type) << endl;
+        cout << "Owner name     : " << showName(v.owner) << endl;
+        cout << "Slot number    : " << slots[index].getSlotNo() << endl;
+        cout << "Entry time     : " << getTimeText(v.entryTime) << endl;
+        cout << "Exit time      : " << getTimeText(now) << endl;
+        cout << "Total hours    : " << hours << endl;
+        if (discount) {
+            cout << "Monthly pass   : 50% off" << endl;
+        }
+        cout << "Total amount   : Rs. " << fee << endl;
+
+        saveHistory(v, slots[index].getSlotNo(), now, fee);
+        saveData();
+    }
+
+    void searchVehicle(string number) {
+        int index = findVehicle(number);
+        if (index == -1) {
+            cout << "This vehicle is not in the parking lot." << endl;
+            return;
+        }
+        Vehicle v = slots[index].getVehicle();
+        cout << "Vehicle found." << endl;
+        cout << "Slot number : " << slots[index].getSlotNo() << endl;
+        cout << "Owner name  : " << showName(v.owner) << endl;
+        cout << "Phone       : " << v.phone << endl;
+        cout << "Entry time  : " << getTimeText(v.entryTime) << endl;
+    }
+
+    void showSlots() {
+        cout << endl;
+        cout << left << setw(8) << "Slot" << setw(8) << "Type" << "Status" << endl;
+        cout << "------------------------------------" << endl;
+        for (int i = 0; i < (int)slots.size(); i++) {
+            cout << left << setw(8) << slots[i].getSlotNo()
+                 << setw(8) << getTypeName(slots[i].getType());
+            if (slots[i].isFull()) {
+                cout << slots[i].getVehicle().number << endl;
+            } else {
+                cout << "Free" << endl;
+            }
+        }
+    }
+
+    void showVehicles() {
+        bool found = false;
+        cout << endl;
+        cout << left << setw(6) << "Slot" << setw(14) << "Number"
+             << setw(8) << "Type" << setw(18) << "Owner" << "Entry time" << endl;
+        cout << "-----------------------------------------------------------" << endl;
+        for (int i = 0; i < (int)slots.size(); i++) {
+            if (slots[i].isFull()) {
+                Vehicle v = slots[i].getVehicle();
+                cout << left << setw(6) << slots[i].getSlotNo()
+                     << setw(14) << v.number
+                     << setw(8) << getTypeName(v.type)
+                     << setw(18) << showName(v.owner)
+                     << getTimeText(v.entryTime) << endl;
+                found = true;
+            }
+        }
+        if (!found) {
+            cout << "No vehicles are parked right now." << endl;
+        }
+    }
+
+    void showCount() {
+        cout << endl;
+        for (int type = BIKE; type <= TRUCK; type++) {
+            int total = 0;
+            int used = 0;
+            for (int i = 0; i < (int)slots.size(); i++) {
+                if (slots[i].getType() == type) {
+                    total++;
+                    if (slots[i].isFull()) {
+                        used++;
+                    }
+                }
+            }
+            cout << getTypeName(type) << " slots used: " << used << " out of " << total << endl;
+        }
+    }
+
+    void showHistory() {
+        ifstream file("history.txt");
+        if (!file) {
+            cout << "There is no history yet." << endl;
+            return;
+        }
+
+        string number;
+        int type, slotNo, fee;
+        long long entry, exitTime;
+        bool found = false;
+
+        cout << endl;
+        cout << left << setw(15) << "Number" << setw(8) << "Type" << setw(6) << "Slot"
+             << setw(19) << "Entry" << setw(19) << "Exit" << "Amount" << endl;
+        cout << "----------------------------------------------------------------------" << endl;
+        while (file >> number >> type >> slotNo >> entry >> exitTime >> fee) {
+            cout << left << setw(15) << number << setw(8) << getTypeName(type)
+                 << setw(6) << slotNo << setw(19) << getTimeText(entry)
+                 << setw(19) << getTimeText(exitTime) << "Rs. " << fee << endl;
+            found = true;
+        }
+        if (!found) {
+            cout << "There is no history yet." << endl;
+        }
+    }
+
+    void showEarnings(bool onlyToday) {
+        ifstream file("history.txt");
+        string number;
+        int type, slotNo, fee;
+        long long entry, exitTime;
+        int count = 0;
+        int total = 0;
+
+        time_t now = time(NULL);
+        tm *today = localtime(&now);
+        int todayDay = today->tm_yday;
+        int todayYear = today->tm_year;
+
+        while (file >> number >> type >> slotNo >> entry >> exitTime >> fee) {
+            if (onlyToday) {
+                time_t t = exitTime;
+                tm *day = localtime(&t);
+                if (day->tm_yday != todayDay || day->tm_year != todayYear) {
+                    continue;
+                }
+            }
+            count++;
+            total = total + fee;
+        }
+
+        cout << endl;
+        if (onlyToday) {
+            cout << "Today's report" << endl;
+        } else {
+            cout << "Total report" << endl;
+        }
+        cout << "Vehicles served : " << count << endl;
+        cout << "Money collected : Rs. " << total << endl;
+    }
+
+    void addPass(string number) {
+        if (hasPass(number)) {
+            cout << "This vehicle already has a monthly pass." << endl;
+            return;
+        }
+        passes.push_back(number);
+        savePasses();
+        cout << "Monthly pass added for " << number << "." << endl;
+    }
+
+    void showPasses() {
+        if (passes.size() == 0) {
+            cout << "No monthly passes have been added yet." << endl;
+            return;
+        }
+        cout << endl;
+        cout << "Vehicles with monthly pass:" << endl;
+        for (int i = 0; i < (int)passes.size(); i++) {
+            cout << i + 1 << ". " << passes[i] << endl;
+        }
+    }
+
+    void loadPasses() {
+        ifstream file("passes.txt");
+        string number;
+        while (file >> number) {
+            passes.push_back(number);
+        }
+    }
+
+    void saveData() {
+        ofstream file("parking_data.txt");
+        for (int i = 0; i < (int)slots.size(); i++) {
+            if (slots[i].isFull()) {
+                Vehicle v = slots[i].getVehicle();
+                file << v.number << " " << v.type << " " << slots[i].getSlotNo() << " "
+                     << v.entryTime << " " << v.owner << " " << v.phone << endl;
+            }
+        }
+    }
+
+    void loadData() {
+        ifstream file("parking_data.txt");
+        if (!file) {
+            return;
+        }
+        string number, owner, phone;
+        int type, slotNo;
+        long long entry;
+        while (file >> number >> type >> slotNo >> entry >> owner >> phone) {
+            if (slotNo < 1 || slotNo > (int)slots.size()) {
+                continue;
+            }
+            if (slots[slotNo - 1].getType() != type) {
+                continue;
+            }
+            Vehicle v;
+            v.number = number;
+            v.type = type;
+            v.entryTime = entry;
+            v.owner = owner;
+            v.phone = phone;
+            slots[slotNo - 1].parkVehicle(v);
+        }
+    }
+};
+
+int getChoice(string message, int low, int high) {
+    int choice;
     while (true) {
-        cout << prompt;
-        if (cin >> value && value >= lo && value <= hi) {
+        cout << message;
+        if (cin >> choice && choice >= low && choice <= high) {
             cin.ignore(numeric_limits<streamsize>::max(), '\n');
-            return value;
+            return choice;
         }
         cin.clear();
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
-        cout << "  Invalid input. Enter a number between " << lo << " and " << hi << ".\n";
+        cout << "Wrong input. Please enter a number from " << low << " to " << high << "." << endl;
     }
 }
 
-string readPlate() {
-    string line, plate;
+string getVehicleNumber() {
+    string line;
     while (true) {
-        cout << "Enter vehicle number (e.g. AP39AB1234): ";
+        cout << "Enter vehicle number (example AP39AB1234): ";
         getline(cin, line);
-        plate = normalisePlate(line);
-        if (plate.size() >= 4 && plate.size() <= 12) return plate;
-        cout << "  Invalid vehicle number.\n";
-    }
-}
 
-// Number of billable hours: every started hour counts, minimum one.
-int billableHours(time_t entry, time_t exit) {
-    double seconds = difftime(exit, entry);
-    int hours = static_cast<int>(ceil(seconds / 3600.0));
-    return max(hours, 1);
-}
-struct Vehicle {
-    string plate;
-    VehicleType type = VehicleType::Car;
-    time_t entryTime = 0;
-};
-public:
-    Slot(int number, VehicleType type) : number_(number), type_(type) {}
-
-    int number() const { return number_; }
-    VehicleType type() const { return type_; }
-    bool isFree() const { return !occupied_; }
-    const Vehicle& vehicle() const { return vehicle_; }
-
-    void park(const Vehicle& v) {
-        vehicle_ = v;
-        occupied_ = true;
-    }
-
-    Vehicle release() {
-        occupied_ = false;
-        return vehicle_;
-    }
-
-private:
-    int number_;
-    VehicleType type_;
-    bool occupied_ = false;
-    Vehicle vehicle_;
-};
-class ParkingLot {
-public:
-    ParkingLot(int bikeSlots, int carSlots, int truckSlots) {
-        int n = 1;
-        for (int i = 0; i < bikeSlots; ++i)  slots_.emplace_back(n++, VehicleType::Bike);
-        for (int i = 0; i < carSlots; ++i)   slots_.emplace_back(n++, VehicleType::Car);
-        for (int i = 0; i < truckSlots; ++i) slots_.emplace_back(n++, VehicleType::Truck);
-    }
-
-    void parkVehicle(const string& plate, VehicleType type) {
-        if (findByPlate(plate)) {
-            cout << "  This vehicle is already parked.\n";
-            return;
-        }
-        Slot* slot = findFreeSlot(type);
-        if (!slot) {
-            cout << "  Sorry, no free " << typeName(type) << " slot available.\n";
-            return;
-        }
-        Vehicle v;
-        v.plate = plate;
-        v.type = type;
-        v.entryTime = time(nullptr);
-        slot->park(v);
-        save();
-
-        cout << "\n  ---- PARKING TICKET ----\n"
-             << "  Vehicle : " << plate << " (" << typeName(type) << ")\n"
-             << "  Slot    : " << slot->number() << "\n"
-             << "  Entry   : " << formatTime(v.entryTime) << "\n"
-             << "  Rate    : Rs. " << hourlyRate(type) << " / hour\n";
-    }
-
-    void removeVehicle(const string& plate) {
-        Slot* slot = findByPlate(plate);
-        if (!slot) {
-            cout << "  No parked vehicle found with that number.\n";
-            return;
-        }
-        time_t now = time(nullptr);
-        Vehicle v = slot->release();
-        int hours = billableHours(v.entryTime, now);
-        double fee = hours * hourlyRate(v.type);
-
-        cout << "\n  ---- PARKING BILL ----\n"
-             << "  Vehicle : " << v.plate << " (" << typeName(v.type) << ")\n"
-             << "  Slot    : " << slot->number() << "\n"
-             << "  Entry   : " << formatTime(v.entryTime) << "\n"
-             << "  Exit    : " << formatTime(now) << "\n"
-             << "  Hours   : " << hours << "\n"
-             << fixed << setprecision(2)
-             << "  Amount  : Rs. " << fee << "\n";
-
-        appendHistory(v, slot->number(), now, fee);
-        save();
-    }
-
-    void searchVehicle(const string& plate) const {
-        const Slot* slot = findByPlate(plate);
-        if (!slot) {
-            cout << "  Vehicle not found in the parking lot.\n";
-            return;
-        }
-        cout << "  Found: " << slot->vehicle().plate << " in slot " << slot->number()
-             << ", parked since " << formatTime(slot->vehicle().entryTime) << "\n";
-    }
-
-    void showSlots() const {
-        cout << "\n  Slot  Type   Status\n  ----------------------------\n";
-        for (const Slot& s : slots_) {
-            cout << "  " << setw(4) << left << s.number()
-                 << setw(7) << typeName(s.type())
-                 << (s.isFree() ? "Free" : "Occupied (" + s.vehicle().plate + ")") << "\n";
-        }
-    }
-
-    void showParkedVehicles() const {
-        bool any = false;
-        cout << "\n  Slot  Vehicle       Type   Entry time\n"
-             << "  ------------------------------------------\n";
-        for (const Slot& s : slots_) {
-            if (s.isFree()) continue;
-            any = true;
-            cout << "  " << setw(4) << left << s.number()
-                 << setw(14) << s.vehicle().plate
-                 << setw(7) << typeName(s.type())
-                 << formatTime(s.vehicle().entryTime) << "\n";
-        }
-        if (!any) cout << "  (no vehicles parked)\n";
-    }
-
-    void showSummary() const {
-        for (VehicleType t : {VehicleType::Bike, VehicleType::Car, VehicleType::Truck}) {
-            int total = 0, used = 0;
-            for (const Slot& s : slots_) {
-                if (s.type() != t) continue;
-                ++total;
-                if (!s.isFree()) ++used;
+        string number = "";
+        for (int i = 0; i < (int)line.size(); i++) {
+            char c = line[i];
+            if (c == ' ' || c == '-') {
+                continue;
             }
-            cout << "  " << setw(6) << left << typeName(t)
-                 << used << " / " << total << " occupied\n";
+            if (c >= 'a' && c <= 'z') {
+                c = c - 32;
+            }
+            number += c;
         }
-    }
 
-    void showHistory() const {
-        ifstream in(HISTORY_FILE);
-        if (!in) {
-            cout << "  No history yet.\n";
-            return;
+        if (number.size() >= 4 && number.size() <= 12) {
+            return number;
         }
-        string line;
-        getline(in, line);  // skip header
-        cout << "\n  Vehicle      Type   Slot  Entry              Exit               Fee\n"
-             << "  ---------------------------------------------------------------------\n";
-        bool any = false;
-        while (getline(in, line)) {
-            vector<string> f;
-            stringstream ss(line);
-            string part;
-            while (getline(ss, part, ',')) f.push_back(part);
-            if (f.size() != 6) continue;
-            any = true;
-            cout << "  " << setw(13) << left << f[0] << setw(7) << f[1] << setw(6) << f[2]
-                 << setw(19) << formatTime(stol(f[3])) << setw(19) << formatTime(stol(f[4]))
-                 << "Rs. " << f[5] << "\n";
-        }
-        if (!any) cout << "  No history yet.\n";
+        cout << "That vehicle number is not valid. Try again." << endl;
     }
-
-    // Saved format, one parked vehicle per line:  plate type slotNumber entryTime
-    void save() const {
-        ofstream out(DATA_FILE);
-        for (const Slot& s : slots_) {
-            if (s.isFree()) continue;
-            out << s.vehicle().plate << ' ' << static_cast<int>(s.vehicle().type) << ' '
-                << s.number() << ' ' << s.vehicle().entryTime << '\n';
-        }
-    }
-
-    void load() {
-        ifstream in(DATA_FILE);
-        if (!in) return;
-        string plate;
-        int type, slotNo;
-        long long entry;
-        while (in >> plate >> type >> slotNo >> entry) {
-            if (slotNo < 1 || slotNo > static_cast<int>(slots_.size())) continue;
-            if (type < 1 || type > 3) continue;
-            Slot& s = slots_[slotNo - 1];
-            if (s.type() != static_cast<VehicleType>(type)) continue;
-            Vehicle v;
-            v.plate = plate;
-            v.type = s.type();
-            v.entryTime = static_cast<time_t>(entry);
-            s.park(v);
-        }
-    }
-
-private:
-    vector<Slot> slots_;
-
-    Slot* findFreeSlot(VehicleType type) {
-        for (Slot& s : slots_)
-            if (s.type() == type && s.isFree()) return &s;
-        return nullptr;
-    }
-
-    Slot* findByPlate(const string& plate) {
-        for (Slot& s : slots_)
-            if (!s.isFree() && s.vehicle().plate == plate) return &s;
-        return nullptr;
-    }
-
-    const Slot* findByPlate(const string& plate) const {
-        for (const Slot& s : slots_)
-            if (!s.isFree() && s.vehicle().plate == plate) return &s;
-        return nullptr;
-    }
-
-    void appendHistory(const Vehicle& v, int slotNo, time_t exitTime, double fee) const {
-        bool newFile = false;
-        {
-            ifstream check(HISTORY_FILE);
-            newFile = !check.good();
-        }
-        ofstream out(HISTORY_FILE, ios::app);
-        if (newFile) out << "plate,type,slot,entry,exit,fee\n";
-        out << v.plate << ',' << typeName(v.type) << ',' << slotNo << ','
-            << v.entryTime << ',' << exitTime << ',' << fixed << setprecision(2) << fee << '\n';
-    }
-};
-
-VehicleType askVehicleType() {
-    cout << "  1. Bike\n  2. Car\n  3. Truck\n";
-    return static_cast<VehicleType>(readInt("Select vehicle type: ", 1, 3));
 }
 
-void printMenu() {
-    cout << "\n==== VEHICLE PARKING MANAGEMENT SYSTEM ====\n"
-         << "  1. Park a vehicle\n"
-         << "  2. Remove a vehicle and generate bill\n"
-         << "  3. Search a vehicle\n"
-         << "  4. Show all slots\n"
-         << "  5. Show parked vehicles\n"
-         << "  6. Occupancy summary\n"
-         << "  7. Parking history\n"
-         << "  0. Exit\n";
+string getOwnerName() {
+    string line;
+    while (true) {
+        cout << "Enter owner name: ";
+        getline(cin, line);
+        if (line.size() < 2 || line.size() > 20) {
+            cout << "Name should be 2 to 20 letters long." << endl;
+            continue;
+        }
+        for (int i = 0; i < (int)line.size(); i++) {
+            if (line[i] == ' ') {
+                line[i] = '_';
+            }
+        }
+        return line;
+    }
+}
+
+string getPhone() {
+    string line;
+    while (true) {
+        cout << "Enter 10 digit mobile number: ";
+        getline(cin, line);
+        bool ok = (line.size() == 10);
+        for (int i = 0; i < (int)line.size(); i++) {
+            if (line[i] < '0' || line[i] > '9') {
+                ok = false;
+            }
+        }
+        if (ok) {
+            return line;
+        }
+        cout << "Mobile number must have exactly 10 digits." << endl;
+    }
+}
+
+int getVehicleType() {
+    cout << "1. Bike" << endl;
+    cout << "2. Car" << endl;
+    cout << "3. Truck" << endl;
+    return getChoice("Choose vehicle type: ", 1, 3);
+}
+
+void showMenu() {
+    cout << endl;
+    cout << "===== VEHICLE PARKING MANAGEMENT SYSTEM =====" << endl;
+    cout << "1. Park a vehicle" << endl;
+    cout << "2. Remove a vehicle and get bill" << endl;
+    cout << "3. Search a vehicle" << endl;
+    cout << "4. Show all slots" << endl;
+    cout << "5. Show parked vehicles" << endl;
+    cout << "6. Show slots used" << endl;
+    cout << "7. Show parking history" << endl;
+    cout << "8. Admin login" << endl;
+    cout << "0. Exit" << endl;
+}
+
+void changeRates() {
+    cout << "Current rates per hour: Bike Rs. " << bikeRate << ", Car Rs. " << carRate
+         << ", Truck Rs. " << truckRate << endl;
+    bikeRate = getChoice("Enter new bike rate: ", 1, 1000);
+    carRate = getChoice("Enter new car rate: ", 1, 1000);
+    truckRate = getChoice("Enter new truck rate: ", 1, 1000);
+    saveRates();
+    cout << "Rates updated." << endl;
+}
+
+void adminMenu(ParkingLot &lot) {
+    string password;
+    int tries = 0;
+    while (tries < 3) {
+        cout << "Enter admin password: ";
+        getline(cin, password);
+        if (password == ADMIN_PASSWORD) {
+            break;
+        }
+        tries++;
+        cout << "Wrong password." << endl;
+    }
+    if (tries == 3) {
+        cout << "Too many wrong tries. Going back to the main menu." << endl;
+        return;
+    }
+
+    while (true) {
+        cout << endl;
+        cout << "----- ADMIN MENU -----" << endl;
+        cout << "1. Today's earnings" << endl;
+        cout << "2. Total earnings" << endl;
+        cout << "3. Add monthly pass" << endl;
+        cout << "4. Show monthly pass vehicles" << endl;
+        cout << "5. Change hourly rates" << endl;
+        cout << "0. Back to main menu" << endl;
+        int choice = getChoice("Enter your choice: ", 0, 5);
+
+        if (choice == 1) {
+            lot.showEarnings(true);
+        } else if (choice == 2) {
+            lot.showEarnings(false);
+        } else if (choice == 3) {
+            lot.addPass(getVehicleNumber());
+        } else if (choice == 4) {
+            lot.showPasses();
+        } else if (choice == 5) {
+            changeRates();
+        } else {
+            return;
+        }
+    }
 }
 
 int main() {
-    ParkingLot lot(10, 20, 5);  // bike, car, truck slots
-    lot.load();
+    ParkingLot lot(10, 20, 5);
+    loadRates();
+    lot.loadData();
+    lot.loadPasses();
 
     while (true) {
-        printMenu();
-        int choice = readInt("Enter your choice: ", 0, 7);
-        switch (choice) {
-            case 1: {
-                VehicleType t = askVehicleType();
-                lot.parkVehicle(readPlate(), t);
-                break;
-            }
-            case 2: lot.removeVehicle(readPlate()); break;
-            case 3: lot.searchVehicle(readPlate()); break;
-            case 4: lot.showSlots(); break;
-            case 5: lot.showParkedVehicles(); break;
-            case 6: lot.showSummary(); break;
-            case 7: lot.showHistory(); break;
-            case 0:
-                lot.save();
-                cout << "Goodbye!\n";
-                return 0;
+        showMenu();
+        int choice = getChoice("Enter your choice: ", 0, 8);
+
+        if (choice == 1) {
+            int type = getVehicleType();
+            string number = getVehicleNumber();
+            string owner = getOwnerName();
+            string phone = getPhone();
+            lot.parkVehicle(number, type, owner, phone);
+        } else if (choice == 2) {
+            lot.removeVehicle(getVehicleNumber());
+        } else if (choice == 3) {
+            lot.searchVehicle(getVehicleNumber());
+        } else if (choice == 4) {
+            lot.showSlots();
+        } else if (choice == 5) {
+            lot.showVehicles();
+        } else if (choice == 6) {
+            lot.showCount();
+        } else if (choice == 7) {
+            lot.showHistory();
+        } else if (choice == 8) {
+            adminMenu(lot);
+        } else {
+            lot.saveData();
+            cout << "Thank you. Goodbye!" << endl;
+            break;
         }
     }
+    return 0;
 }
